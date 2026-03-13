@@ -284,6 +284,29 @@ export default function ShippingCalculator() {
     if (p.has('client')) setClientName(p.get('client')!);
   }, []);
 
+  // Compute orders above a threshold from bucket data
+  const ordersAboveFromBuckets = useCallback((threshold: number, buckets: typeof ORDER_BUCKETS) => {
+    return buckets.reduce((sum, b) => {
+      if (b.min >= threshold) return sum + b.orders;
+      if (b.max <= threshold) return sum;
+      // Threshold falls within this bucket — linearly interpolate
+      const bucketRange = b.max === Infinity ? 250 : b.max - b.min;
+      const aboveFraction = b.max === Infinity ? 1 : (b.max - threshold) / bucketRange;
+      return sum + Math.round(b.orders * Math.max(0, Math.min(1, aboveFraction)));
+    }, 0);
+  }, []);
+
+  // Threshold change handlers — auto-populate orders from bucket data
+  const handleThreshold1Change = useCallback((val: number) => {
+    setThreshold1(val);
+    setOrdersAboveT1(ordersAboveFromBuckets(val, activeBuckets));
+  }, [activeBuckets, ordersAboveFromBuckets]);
+
+  const handleThreshold2Change = useCallback((val: number) => {
+    setThreshold2(val);
+    setOrdersAboveT2(ordersAboveFromBuckets(val, activeBuckets));
+  }, [activeBuckets, ordersAboveFromBuckets]);
+
   // Parse pasted order data
   const parsePastedData = () => {
     const values = pasteText
@@ -302,12 +325,7 @@ export default function ShippingCalculator() {
     setCustomBuckets(buckets);
     setAnnualOrders(totalOrders);
     setAov(Math.round(values.reduce((a, b) => a + b, 0) / totalOrders));
-
-    // Auto-populate qualifying orders
-    const above1 = values.filter(v => v >= threshold1).length;
-    const above2 = values.filter(v => v >= threshold2).length;
-    setOrdersAboveT1(above1);
-    setOrdersAboveT2(above2);
+    // Orders above thresholds auto-update via useEffect on activeBuckets change
     setShowPasteData(false);
     setPasteText('');
   };
@@ -392,10 +410,9 @@ export default function ShippingCalculator() {
       {/* ─── Header ─── */}
       <div className="text-center mb-8 animate-fade-in-up">
         {/* Top bar: currency + share + presets */}
-        <div className="flex items-center justify-between mb-6">
-          <div /> {/* spacer */}
+        <div className="relative flex items-center justify-center mb-6">
           <span className="text-4xl font-black text-[#10222b] tracking-tight">IMPACT.</span>
-          <div className="flex items-center gap-2">
+          <div className="absolute right-0 flex items-center gap-2">
             {/* Currency */}
             <select
               value={currency}
@@ -536,7 +553,7 @@ export default function ShippingCalculator() {
             </div>
 
             <div className="space-y-4">
-              <SliderInput label="Variation 1 — free shipping above" value={threshold1} onChange={setThreshold1} min={50} max={1000} step={10} prefix={sym} />
+              <SliderInput label="Variation 1 — free shipping above" value={threshold1} onChange={handleThreshold1Change} min={50} max={1000} step={10} prefix={sym} />
               <SliderInput
                 label="Orders above this threshold"
                 value={ordersAboveT1} onChange={setOrdersAboveT1}
@@ -547,7 +564,7 @@ export default function ShippingCalculator() {
               {compareTwo && (
                 <>
                   <div className="border-t border-[#9abbd8]/20 my-4" />
-                  <SliderInput label="Variation 2 — free shipping above" value={threshold2} onChange={setThreshold2} min={50} max={1000} step={10} prefix={sym} />
+                  <SliderInput label="Variation 2 — free shipping above" value={threshold2} onChange={handleThreshold2Change} min={50} max={1000} step={10} prefix={sym} />
                   <SliderInput
                     label="Orders above this threshold"
                     value={ordersAboveT2} onChange={setOrdersAboveT2}
