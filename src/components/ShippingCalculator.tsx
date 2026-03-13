@@ -584,8 +584,8 @@ export default function ShippingCalculator() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:ml-auto text-sm">
                 <span>
                   <span className="text-[#565656]">Breakeven </span>
-                  <span className="font-bold text-[#10222b]">{beMonthly ? calcs.v1BEOrdersMo.toLocaleString() : Math.round(calcs.v1BEOrders).toLocaleString()} orders/{beMonthly ? 'mo' : 'yr'}</span>
-                  <span className="text-[#4e7597] font-semibold"> ({fmtPct(calcs.v1BEPct)} lift)</span>
+                  <span className="font-bold text-[#10222b]">{fmtPct(calcs.v1BEPct)} lift</span>
+                  <span className="text-[#565656]"> ({beMonthly ? calcs.v1BEOrdersMo.toLocaleString() : Math.round(calcs.v1BEOrders).toLocaleString()} orders/{beMonthly ? 'mo' : 'yr'})</span>
                 </span>
                 <span className="text-[#565656]">·</span>
                 <span>
@@ -623,8 +623,10 @@ export default function ShippingCalculator() {
                     </div>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-[#243e42]">{beMonthly ? calcs.v2BEOrdersMo.toLocaleString() : Math.round(calcs.v2BEOrders).toLocaleString()} orders/{beMonthly ? 'mo' : 'yr'}</span>
-                    <span className="text-lg font-bold text-[#4e7597]">{fmtPct(calcs.v2BEPct)} lift</span>
+                    <span className="text-2xl font-extrabold text-[#243e42]">{fmtPct(calcs.v2BEPct)} conversion lift</span>
+                  </div>
+                  <div className="text-xs text-[#565656] mt-1">
+                    {beMonthly ? calcs.v2BEOrdersMo.toLocaleString() : Math.round(calcs.v2BEOrders).toLocaleString()} additional orders/{beMonthly ? 'mo' : 'yr'} at {fmt(calcs.contribInclCPA)} margin/order
                   </div>
                 </div>
 
@@ -834,17 +836,17 @@ export default function ShippingCalculator() {
         <div className={`grid ${compareTwo ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-4`}>
           <div className="bg-white/10 rounded-xl p-4 border border-white/10">
             <p className="text-sm text-[#9abbd8]">
-              <span className="text-white font-semibold">Variation 1</span> pays for itself with just{' '}
-              <span className="text-[#72ab7f] font-bold">{Math.round(calcs.v1BEOrders).toLocaleString()} extra orders</span> — a{' '}
-              <span className="text-[#72ab7f] font-bold">{fmtPct(calcs.v1BEPct)} lift</span>.
+              <span className="text-white font-semibold">Variation 1</span> breaks even at just a{' '}
+              <span className="text-[#72ab7f] font-bold">{fmtPct(calcs.v1BEPct)} conversion lift</span> — that&apos;s{' '}
+              <span className="text-white">{calcs.v1BEOrdersMo.toLocaleString()} extra orders/mo</span>.
             </p>
           </div>
 
           {compareTwo && (
             <div className="bg-white/10 rounded-xl p-4 border border-white/10">
               <p className="text-sm text-[#9abbd8]">
-                <span className="text-white font-semibold">Variation 2</span> needs a{' '}
-                <span className="text-white font-bold">{fmtPct(calcs.v2BEPct)}</span> conversion lift on its own
+                <span className="text-white font-semibold">Variation 2</span> requires a{' '}
+                <span className="text-[#72ab7f] font-bold">{fmtPct(calcs.v2BEPct)}</span> conversion lift to break even
                 {calcs.v2WithAOV20 < 0.5
                   ? <>, but if the threshold pushes AOV up by {sym}20, it&apos;s profitable at virtually any conversion improvement.</>
                   : <>, but only <span className="text-[#72ab7f] font-bold">{fmtPct(calcs.v2WithAOV20)}</span> with a {sym}20 AOV bump.</>
