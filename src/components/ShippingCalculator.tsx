@@ -325,7 +325,8 @@ export default function ShippingCalculator() {
     setCustomBuckets(buckets);
     setAnnualOrders(totalOrders);
     setAov(Math.round(values.reduce((a, b) => a + b, 0) / totalOrders));
-    // Orders above thresholds auto-update via useEffect on activeBuckets change
+    setOrdersAboveT1(ordersAboveFromBuckets(threshold1, buckets));
+    setOrdersAboveT2(ordersAboveFromBuckets(threshold2, buckets));
     setShowPasteData(false);
     setPasteText('');
   };
@@ -333,27 +334,23 @@ export default function ShippingCalculator() {
   // Calculations
   const calcs = useMemo(() => {
     const margin = (100 - varCostsPct) / 100;
-    const ordersBetween = ordersAboveT2 - ordersAboveT1;
-
     // Contribution per incremental order
     // Margin already includes CPA
     const contribInclCPA = aov * margin;
     const contribExclCPA = aov * margin + cpa;
 
-    // --- Variation 1 ---
+    // --- Variation 1 (higher threshold) ---
     const v1ShippingLost = ordersAboveT1 * shippingAbove;
     const v1BEOrders = contribInclCPA > 0 ? v1ShippingLost / contribInclCPA : Infinity;
     const v1BEPct = annualOrders > 0 ? (v1BEOrders / annualOrders) * 100 : 0;
-    const v1BEOrdersExcl = contribExclCPA > 0 ? v1ShippingLost / contribExclCPA : Infinity;
-    const v1BEPctExcl = annualOrders > 0 ? (v1BEOrdersExcl / annualOrders) * 100 : 0;
     const v1TestCost = (v1ShippingLost / 12) * (1 / 3);
 
-    // --- Variation 2 ---
+    // --- Variation 2 (lower threshold — captures more orders) ---
+    // Orders above T1 currently pay shippingAbove; orders between T2 and T1 pay shippingBelow
+    const ordersBetween = Math.max(0, ordersAboveT2 - ordersAboveT1);
     const v2ShippingLost = (ordersBetween * shippingBelow) + (ordersAboveT1 * shippingAbove);
     const v2BEOrders = contribInclCPA > 0 ? v2ShippingLost / contribInclCPA : Infinity;
     const v2BEPct = annualOrders > 0 ? (v2BEOrders / annualOrders) * 100 : 0;
-    const v2BEOrdersExcl = contribExclCPA > 0 ? v2ShippingLost / contribExclCPA : Infinity;
-    const v2BEPctExcl = annualOrders > 0 ? (v2BEOrdersExcl / annualOrders) * 100 : 0;
     const v2TestCost = (v2ShippingLost / 12) * (1 / 3);
 
     // --- Matrices ---
@@ -615,7 +612,7 @@ export default function ShippingCalculator() {
               </div>
             </div>
             <div className="mt-2 text-xs text-[#565656]">
-              Revenue forfeited: <span className="font-semibold text-[#e57373]">{fmtMo(calcs.v1ShippingLost)}/mo</span> ({fmt(calcs.v1ShippingLost)}/yr) · Test cost: {fmt(calcs.v1TestCost)}
+              Revenue forfeited: <span className="font-semibold text-[#e57373]">{fmtMo(calcs.v1ShippingLost)}/mo</span> ({fmt(calcs.v1ShippingLost)}/yr)
             </div>
           </div>
 
@@ -949,7 +946,7 @@ export default function ShippingCalculator() {
                     </button>
                     {customBuckets && (
                       <button
-                        onClick={() => setCustomBuckets(null)}
+                        onClick={() => { setCustomBuckets(null); setOrdersAboveT1(ordersAboveFromBuckets(threshold1, ORDER_BUCKETS)); setOrdersAboveT2(ordersAboveFromBuckets(threshold2, ORDER_BUCKETS)); }}
                         className="text-xs text-[#565656] hover:text-[#e57373] transition-colors"
                       >
                         Reset to defaults
