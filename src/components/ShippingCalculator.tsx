@@ -214,6 +214,7 @@ export default function ShippingCalculator() {
 
   // UI state
   const [showWorstCase, setShowWorstCase] = useState(false);
+  const [beMonthly, setBeMonthly] = useState(true);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [matrixVariation, setMatrixVariation] = useState<1 | 2>(2);
   const [matrixMonthly, setMatrixMonthly] = useState(false);
@@ -583,7 +584,7 @@ export default function ShippingCalculator() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:ml-auto text-sm">
                 <span>
                   <span className="text-[#565656]">Breakeven </span>
-                  <span className="font-bold text-[#10222b]">{calcs.v1BEOrdersMo.toLocaleString()} orders/mo</span>
+                  <span className="font-bold text-[#10222b]">{beMonthly ? calcs.v1BEOrdersMo.toLocaleString() : Math.round(calcs.v1BEOrders).toLocaleString()} orders/{beMonthly ? 'mo' : 'yr'}</span>
                   <span className="text-[#4e7597] font-semibold"> ({fmtPct(calcs.v1BEPct)} lift)</span>
                 </span>
                 <span className="text-[#565656]">·</span>
@@ -614,9 +615,15 @@ export default function ShippingCalculator() {
               <div className="space-y-2">
                 {/* Breakeven — hero metric */}
                 <div className="bg-white/60 rounded-xl p-4 border border-[#72ab7f]/20">
-                  <div className="text-xs text-[#565656] mb-1">Breakeven</div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-[#565656]">Breakeven</span>
+                    <div className="flex items-center bg-[#f2efe6]/60 rounded-full p-0.5 text-[10px] font-medium">
+                      <button onClick={() => setBeMonthly(true)} className={`px-2 py-0.5 rounded-full transition-all ${beMonthly ? 'bg-white text-[#10222b] shadow-sm' : 'text-[#565656]'}`}>Monthly</button>
+                      <button onClick={() => setBeMonthly(false)} className={`px-2 py-0.5 rounded-full transition-all ${!beMonthly ? 'bg-white text-[#10222b] shadow-sm' : 'text-[#565656]'}`}>Annual</button>
+                    </div>
+                  </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-[#243e42]">{calcs.v2BEOrdersMo.toLocaleString()} orders/mo</span>
+                    <span className="text-2xl font-extrabold text-[#243e42]">{beMonthly ? calcs.v2BEOrdersMo.toLocaleString() : Math.round(calcs.v2BEOrders).toLocaleString()} orders/{beMonthly ? 'mo' : 'yr'}</span>
                     <span className="text-lg font-bold text-[#4e7597]">{fmtPct(calcs.v2BEPct)} lift</span>
                   </div>
                 </div>
