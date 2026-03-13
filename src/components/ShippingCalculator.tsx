@@ -14,7 +14,7 @@ const CURRENCIES: Record<string, { symbol: string; code: string }> = {
 /* ─── Presets ─── */
 const PRESETS: Record<string, {
   label: string;
-  annualOrders: number; aov: number; marginPct: number; cpa: number;
+  annualOrders: number; aov: number; varCostsPct: number; cpa: number;
   shippingAbove: number; shippingBelow: number;
   threshold1: number; threshold2: number;
   ordersAboveT1: number; ordersAboveT2: number;
@@ -22,7 +22,7 @@ const PRESETS: Record<string, {
 }> = {
   steadyrack_na: {
     label: 'Steadyrack NA',
-    annualOrders: 16153, aov: 268, marginPct: 60, cpa: 45,
+    annualOrders: 16153, aov: 268, varCostsPct: 40, cpa: 45,
     shippingAbove: 10, shippingBelow: 30,
     threshold1: 300, threshold2: 200,
     ordersAboveT1: 5257, ordersAboveT2: 10017,
@@ -30,7 +30,7 @@ const PRESETS: Record<string, {
   },
   steadyrack_eu: {
     label: 'Steadyrack EU',
-    annualOrders: 8400, aov: 245, marginPct: 55, cpa: 38,
+    annualOrders: 8400, aov: 245, varCostsPct: 45, cpa: 38,
     shippingAbove: 8, shippingBelow: 25,
     threshold1: 250, threshold2: 150,
     ordersAboveT1: 3200, ordersAboveT2: 5800,
@@ -38,7 +38,7 @@ const PRESETS: Record<string, {
   },
   blank: {
     label: 'Blank template',
-    annualOrders: 10000, aov: 100, marginPct: 50, cpa: 30,
+    annualOrders: 10000, aov: 100, varCostsPct: 50, cpa: 30,
     shippingAbove: 10, shippingBelow: 20,
     threshold1: 200, threshold2: 100,
     ordersAboveT1: 4000, ordersAboveT2: 7000,
@@ -200,7 +200,7 @@ export default function ShippingCalculator() {
   // Business metrics
   const [annualOrders, setAnnualOrders] = useState(16153);
   const [aov, setAov] = useState(268);
-  const [marginPct, setMarginPct] = useState(60);
+  const [varCostsPct, setVarCostsPct] = useState(40);
   const [cpa, setCpa] = useState(45);
   const [shippingAbove, setShippingAbove] = useState(10);
   const [shippingBelow, setShippingBelow] = useState(30);
@@ -232,7 +232,7 @@ export default function ShippingCalculator() {
   const loadPreset = (key: string) => {
     const p = PRESETS[key];
     if (!p) return;
-    setAnnualOrders(p.annualOrders); setAov(p.aov); setMarginPct(p.marginPct); setCpa(p.cpa);
+    setAnnualOrders(p.annualOrders); setAov(p.aov); setVarCostsPct(p.varCostsPct); setCpa(p.cpa);
     setShippingAbove(p.shippingAbove); setShippingBelow(p.shippingBelow);
     setThreshold1(p.threshold1); setThreshold2(p.threshold2);
     setOrdersAboveT1(p.ordersAboveT1); setOrdersAboveT2(p.ordersAboveT2);
@@ -243,7 +243,7 @@ export default function ShippingCalculator() {
   // Share URL
   const copyShareLink = () => {
     const params = new URLSearchParams({
-      orders: String(annualOrders), aov: String(aov), margin: String(marginPct), cpa: String(cpa),
+      orders: String(annualOrders), aov: String(aov), vc: String(varCostsPct), cpa: String(cpa),
       sa: String(shippingAbove), sb: String(shippingBelow),
       t1: String(threshold1), t2: String(threshold2),
       o1: String(ordersAboveT1), o2: String(ordersAboveT2),
@@ -267,7 +267,8 @@ export default function ShippingCalculator() {
     const n = (k: string) => parseFloat(p.get(k) || '');
     if (p.has('orders')) setAnnualOrders(n('orders'));
     if (p.has('aov')) setAov(n('aov'));
-    if (p.has('margin')) setMarginPct(n('margin'));
+    if (p.has('vc')) setVarCostsPct(n('vc'));
+    if (p.has('margin')) setVarCostsPct(100 - n('margin')); // backwards compat
     if (p.has('cpa')) setCpa(n('cpa'));
     if (p.has('sa')) setShippingAbove(n('sa'));
     if (p.has('sb')) setShippingBelow(n('sb'));
@@ -310,7 +311,7 @@ export default function ShippingCalculator() {
 
   // Calculations
   const calcs = useMemo(() => {
-    const margin = marginPct / 100;
+    const margin = (100 - varCostsPct) / 100;
     const ordersBetween = ordersAboveT2 - ordersAboveT1;
 
     // Contribution per incremental order
@@ -366,7 +367,7 @@ export default function ShippingCalculator() {
       v1MatrixReal, v1MatrixWorst, v2MatrixReal, v2MatrixWorst,
       maxAbs, v2WithAOV20, totalTestCost, contribExclCPA, contribInclCPA,
     };
-  }, [annualOrders, aov, marginPct, cpa, shippingAbove, shippingBelow, ordersAboveT1, ordersAboveT2, compareTwo]);
+  }, [annualOrders, aov, varCostsPct, cpa, shippingAbove, shippingBelow, ordersAboveT1, ordersAboveT2, compareTwo]);
 
   // Active matrix based on variation + mode
   const activeMatrix = (() => {
@@ -481,14 +482,14 @@ export default function ShippingCalculator() {
               <SliderInput label="Annual orders" value={annualOrders} onChange={setAnnualOrders} min={1000} max={100000} step={100} />
               <SliderInput label="Average order value" value={aov} onChange={setAov} min={50} max={500} step={1} prefix={sym} />
               <SliderInput
-                label="Contribution margin %"
-                value={marginPct} onChange={setMarginPct} min={30} max={80} step={1} suffix="%"
-                tooltip="Percentage of revenue remaining after product costs and fulfilment. Exclude advertising spend — that's captured separately in CPA below."
+                label="Variable costs % (incl ad spend)"
+                value={varCostsPct} onChange={setVarCostsPct} min={20} max={70} step={1} suffix="%"
+                tooltip="Percentage of revenue that goes to product costs, fulfilment, and advertising. The remainder is your contribution margin. For example, 40% variable costs = 60% contribution margin."
               />
               <SliderInput
                 label="Cost per acquisition"
                 value={cpa} onChange={setCpa} min={0} max={150} step={1} prefix={sym}
-                tooltip="Average advertising cost to acquire one customer. Incremental orders from free shipping don't incur this cost — they're already on your site."
+                tooltip="Average advertising cost to acquire one new customer. Used to model the worst-case scenario where incremental orders also require ad spend."
               />
             </div>
 
