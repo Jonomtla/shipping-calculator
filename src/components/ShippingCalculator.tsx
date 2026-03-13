@@ -4,8 +4,10 @@ import { useState, useMemo } from 'react';
 
 /* ─── Formatters ─── */
 const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
+const fmtMo = (annual: number) => fmt(Math.round(annual / 12));
 const fmtPct = (n: number) => n.toFixed(1) + '%';
 const fmtOrders = (n: number) => Math.round(n).toLocaleString();
+const annualWithMonthly = (n: number) => `${fmt(n)}/yr (${fmtMo(n)}/mo)`;
 
 /* ─── Order Distribution (hardcoded reference) ─── */
 const ORDER_BUCKETS = [
@@ -142,7 +144,10 @@ export default function ShippingCalculator() {
   const [ordersAboveT2, setOrdersAboveT2] = useState(10017);
 
   // Toggle for CPA in scenario matrix
-  const [showInclCPA, setShowInclCPA] = useState(false);
+  const [showWorstCase, setShowWorstCase] = useState(false);
+
+  // Selected matrix cell
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
 
   // Expandable order distribution
   const [showOrderDist, setShowOrderDist] = useState(false);
@@ -224,7 +229,7 @@ export default function ShippingCalculator() {
     };
   }, [annualOrders, aov, marginPct, cpa, flatRateShipping, standardShipping, ordersAboveT1, ordersAboveT2]);
 
-  const activeMatrix = showInclCPA ? calcs.matrixInclCPA : calcs.matrixExclCPA;
+  const activeMatrix = showWorstCase ? calcs.matrixInclCPA : calcs.matrixExclCPA;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -317,7 +322,10 @@ export default function ShippingCalculator() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-[#9abbd8]/15">
                   <span className="text-sm text-[#565656]">Shipping revenue forfeited</span>
-                  <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.v1ShippingLost)}</span>
+                  <div className="text-right">
+                    <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.v1ShippingLost)}/yr</span>
+                    <div className="text-xs text-[#565656]">{fmtMo(calcs.v1ShippingLost)}/mo</div>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#9abbd8]/15">
                   <span className="text-sm text-[#565656]">Breakeven</span>
@@ -327,7 +335,7 @@ export default function ShippingCalculator() {
                   </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#9abbd8]/15">
-                  <span className="text-sm text-[#565656]/60">Breakeven (excl CPA)</span>
+                  <span className="text-sm text-[#565656]/60">Realistic (excl CPA)</span>
                   <div className="text-right opacity-60">
                     <span className="text-sm font-semibold text-[#565656]">{fmtOrders(calcs.v1BreakevenOrdersExcl)} orders</span>
                     <div className="text-xs text-[#565656]">{fmtPct(calcs.v1BreakevenPctExcl)} lift</div>
@@ -355,7 +363,10 @@ export default function ShippingCalculator() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-[#72ab7f]/20">
                   <span className="text-sm text-[#565656]">Shipping revenue forfeited</span>
-                  <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.v2ShippingLost)}</span>
+                  <div className="text-right">
+                    <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.v2ShippingLost)}/yr</span>
+                    <div className="text-xs text-[#565656]">{fmtMo(calcs.v2ShippingLost)}/mo</div>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#72ab7f]/20">
                   <span className="text-sm text-[#565656]">Breakeven</span>
@@ -365,7 +376,7 @@ export default function ShippingCalculator() {
                   </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#72ab7f]/20">
-                  <span className="text-sm text-[#565656]/60">Breakeven (excl CPA)</span>
+                  <span className="text-sm text-[#565656]/60">Realistic (excl CPA)</span>
                   <div className="text-right opacity-60">
                     <span className="text-sm font-semibold text-[#565656]">{fmtOrders(calcs.v2BreakevenOrdersExcl)} orders</span>
                     <div className="text-xs text-[#565656]">{fmtPct(calcs.v2BreakevenPctExcl)} lift</div>
@@ -422,37 +433,37 @@ export default function ShippingCalculator() {
             </div>
           </div>
 
-          {/* Toggle: Excl CPA / Incl CPA */}
+          {/* Toggle: Realistic / Worst case */}
           <div className="flex items-center bg-[#f2efe6] rounded-lg p-1">
             <button
-              onClick={() => setShowInclCPA(false)}
+              onClick={() => setShowWorstCase(false)}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                !showInclCPA
+                !showWorstCase
                   ? 'bg-[#4e7597] text-white shadow-md'
                   : 'text-[#565656] hover:text-[#10222b]'
               }`}
             >
-              Excl CPA
+              Realistic
             </button>
             <button
-              onClick={() => setShowInclCPA(true)}
+              onClick={() => setShowWorstCase(true)}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                showInclCPA
+                showWorstCase
                   ? 'bg-[#4e7597] text-white shadow-md'
                   : 'text-[#565656] hover:text-[#10222b]'
               }`}
             >
-              Incl CPA
+              Worst case
             </button>
           </div>
         </div>
 
-        {/* Mode label */}
+        {/* Mode explanation */}
         <div className="mb-4 px-3 py-2 bg-[#f4faff] border border-[#9abbd8]/20 rounded-lg inline-block">
           <span className="text-xs font-semibold text-[#4e7597]">
-            {showInclCPA
-              ? 'Worst case: if every new order also costs full CPA'
-              : 'Realistic: incremental orders don\'t cost ad spend'}
+            {showWorstCase
+              ? 'Assumes every new order also costs full CPA to acquire'
+              : 'Incremental orders don\'t cost ad spend — visitors are already on site'}
           </span>
         </div>
 
@@ -479,12 +490,15 @@ export default function ShippingCalculator() {
                   </td>
                   {CVR_LIFTS.map((_, colIdx) => {
                     const value = activeMatrix[rowIdx][colIdx];
+                    const isSelected = selectedCell?.row === rowIdx && selectedCell?.col === colIdx;
                     return (
                       <td
                         key={colIdx}
-                        className={`text-center p-2 text-sm font-semibold border-b border-[#9abbd8]/10 rounded-lg ${getCellColor(value, calcs.maxAbs)}`}
+                        onClick={() => setSelectedCell(isSelected ? null : { row: rowIdx, col: colIdx })}
+                        className={`text-center p-2 text-sm font-semibold border-b border-[#9abbd8]/10 rounded-lg cursor-pointer transition-all ${getCellColor(value, calcs.maxAbs)} ${isSelected ? 'ring-2 ring-[#10222b] ring-offset-1' : 'hover:ring-1 hover:ring-[#9abbd8]'}`}
                       >
-                        {value >= 0 ? '+' : ''}{fmt(value)}
+                        <div>{value >= 0 ? '+' : ''}{fmt(value)}</div>
+                        <div className="text-[10px] font-normal opacity-70">{fmtMo(value)}/mo</div>
                       </td>
                     );
                   })}
@@ -494,6 +508,28 @@ export default function ShippingCalculator() {
           </table>
         </div>
 
+        {/* Selected cell callout */}
+        {selectedCell && (() => {
+          const cvrLift = CVR_LIFTS[selectedCell.col];
+          const aovLift = AOV_LIFTS[selectedCell.row];
+          const value = activeMatrix[selectedCell.row][selectedCell.col];
+          const isProfit = value >= 0;
+          return (
+            <div className={`mt-4 p-4 rounded-xl border-2 animate-fade-in ${isProfit ? 'bg-[#72ab7f]/5 border-[#72ab7f]/30' : 'bg-[#e57373]/5 border-[#e57373]/30'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm text-[#10222b]">
+                  At <span className="font-bold">{cvrLift}% CVR lift</span> and <span className="font-bold">+${aovLift} AOV</span>, Variation 2 {isProfit ? 'generates' : 'loses'}{' '}
+                  <span className={`font-bold text-lg ${isProfit ? 'text-[#72ab7f]' : 'text-[#e57373]'}`}>{annualWithMonthly(Math.abs(value))}</span>
+                  {' '}in net {isProfit ? 'profit' : 'loss'}.
+                </p>
+                <button onClick={() => setSelectedCell(null)} className="text-[#565656] hover:text-[#10222b] p-1 flex-shrink-0">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* How to read this */}
         <div className="mt-4 p-4 bg-[#f4faff] border border-[#9abbd8]/20 rounded-xl">
           <div className="flex items-start gap-2 text-xs text-[#565656]">
@@ -502,7 +538,7 @@ export default function ShippingCalculator() {
             </svg>
             <div>
               <p className="font-medium text-[#10222b] mb-1">How to read this matrix</p>
-              <p>Each cell shows the <strong>net annual profit impact</strong> of Variation 2 if you achieve that combination of CVR lift (columns) and AOV lift (rows). <span className="text-[#72ab7f] font-semibold">Green = profitable</span>, <span className="text-[#e57373] font-semibold">red = loss</span>. Find the combinations where the test pays for itself.</p>
+              <p>Each cell shows the <strong>net annual profit impact</strong> of Variation 2 if you achieve that combination of CVR lift (columns) and AOV lift (rows). <span className="text-[#72ab7f] font-semibold">Green = profitable</span>, <span className="text-[#e57373] font-semibold">red = loss</span>. <strong>Click any cell</strong> to see a plain English summary.</p>
             </div>
           </div>
         </div>
