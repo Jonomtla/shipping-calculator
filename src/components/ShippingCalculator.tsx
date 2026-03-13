@@ -165,22 +165,24 @@ function VerdictBadge({ breakEvenPct }: { breakEvenPct: number }) {
   );
 }
 
-/* ─── Matrix Cell Color (continuous gradient) ─── */
-function getCellColor(value: number, maxAbs: number): string {
-  if (maxAbs === 0) return 'bg-gray-100';
-  const ratio = Math.abs(value) / maxAbs;
+/* ─── Matrix Cell Color (true continuous gradient via inline styles) ─── */
+function getCellStyle(value: number, maxAbs: number): React.CSSProperties {
+  if (maxAbs === 0) return { backgroundColor: '#f3f4f6', color: '#10222b' };
+  const ratio = Math.min(Math.abs(value) / maxAbs, 1);
+  // Stronger power curve for more visible intensity scaling
+  const alpha = 0.08 + 0.92 * Math.pow(ratio, 0.6);
   if (value > 0) {
-    if (ratio > 0.75) return 'bg-[#4a9460] text-white';
-    if (ratio > 0.5) return 'bg-[#72ab7f] text-white';
-    if (ratio > 0.3) return 'bg-[#72ab7f]/60 text-[#10222b]';
-    if (ratio > 0.15) return 'bg-[#72ab7f]/35 text-[#10222b]';
-    return 'bg-[#72ab7f]/15 text-[#10222b]';
+    // Green: lerp from light (#d4edda) to deep (#2d6a3f)
+    const r = Math.round(212 - 133 * alpha);
+    const g = Math.round(237 - 131 * alpha);
+    const b = Math.round(218 - 155 * alpha);
+    return { backgroundColor: `rgb(${r},${g},${b})`, color: alpha > 0.55 ? '#fff' : '#10222b' };
   } else {
-    if (ratio > 0.75) return 'bg-[#c62828] text-white';
-    if (ratio > 0.5) return 'bg-[#e57373] text-white';
-    if (ratio > 0.3) return 'bg-[#e57373]/60 text-[#10222b]';
-    if (ratio > 0.15) return 'bg-[#e57373]/35 text-[#10222b]';
-    return 'bg-[#e57373]/15 text-[#10222b]';
+    // Red: lerp from light (#fde8e8) to deep (#b71c1c)
+    const r = Math.round(253 - 70 * alpha);
+    const g = Math.round(232 - 204 * alpha);
+    const b = Math.round(232 - 204 * alpha);
+    return { backgroundColor: `rgb(${r},${g},${b})`, color: alpha > 0.55 ? '#fff' : '#10222b' };
   }
 }
 
@@ -596,7 +598,7 @@ export default function ShippingCalculator() {
               </div>
             </div>
             <div className="mt-2 text-xs text-[#565656]">
-              Revenue forfeited: {fmt(calcs.v1ShippingLost)}/yr ({fmtMo(calcs.v1ShippingLost)}/mo) · {Math.round(calcs.v1BEOrders).toLocaleString()} additional orders/yr needed to break even
+              Revenue forfeited: <span className="font-semibold text-[#e57373]">{fmtMo(calcs.v1ShippingLost)}/mo</span> ({fmt(calcs.v1ShippingLost)}/yr) · Test cost: {fmt(calcs.v1TestCost)}
             </div>
           </div>
 
@@ -615,17 +617,15 @@ export default function ShippingCalculator() {
               <div className="space-y-2">
                 {/* Breakeven — hero metric */}
                 <div className="bg-white/60 rounded-xl p-4 border border-[#72ab7f]/20">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-[#565656]">Breakeven</span>
+                  <div className="flex items-center justify-end mb-2">
                     <div className="flex items-center bg-[#f2efe6]/60 rounded-full p-0.5 text-[10px] font-medium">
                       <button onClick={() => setBeMonthly(true)} className={`px-2 py-0.5 rounded-full transition-all ${beMonthly ? 'bg-white text-[#10222b] shadow-sm' : 'text-[#565656]'}`}>Monthly</button>
                       <button onClick={() => setBeMonthly(false)} className={`px-2 py-0.5 rounded-full transition-all ${!beMonthly ? 'bg-white text-[#10222b] shadow-sm' : 'text-[#565656]'}`}>Annual</button>
                     </div>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-[#243e42]">{fmtPct(calcs.v2BEPct)} conversion lift</span>
-                  </div>
-                  <div className="text-xs text-[#565656] mt-1">
+                  <div className="text-3xl font-extrabold text-[#243e42]">{fmtPct(calcs.v2BEPct)}</div>
+                  <div className="text-sm text-[#565656] mt-0.5">conversion lift needed to break even</div>
+                  <div className="text-xs text-[#565656]/70 mt-1">
                     {beMonthly ? calcs.v2BEOrdersMo.toLocaleString() : Math.round(calcs.v2BEOrders).toLocaleString()} additional orders/{beMonthly ? 'mo' : 'yr'} at {fmt(calcs.contribInclCPA)} margin/order
                   </div>
                 </div>
@@ -700,8 +700,8 @@ export default function ShippingCalculator() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Variation tab */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            {/* Variation tab — left */}
             {compareTwo && (
               <div className="flex items-center bg-[#f2efe6] rounded-lg p-0.5">
                 <button onClick={() => { setMatrixVariation(1); setSelectedCell(null); }} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${matrixVariation === 1 ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
@@ -713,24 +713,25 @@ export default function ShippingCalculator() {
               </div>
             )}
 
-            {/* Annual / Monthly */}
-            <div className="flex items-center bg-[#f2efe6] rounded-lg p-0.5">
-              <button onClick={() => setMatrixMonthly(false)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${!matrixMonthly ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
-                Annual
-              </button>
-              <button onClick={() => setMatrixMonthly(true)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${matrixMonthly ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
-                Monthly
-              </button>
-            </div>
+            {/* Annual/Monthly + Realistic/Worst case — right */}
+            <div className="flex items-center gap-2 sm:ml-auto">
+              <div className="flex items-center bg-[#f2efe6] rounded-lg p-0.5">
+                <button onClick={() => setMatrixMonthly(false)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${!matrixMonthly ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
+                  Annual
+                </button>
+                <button onClick={() => setMatrixMonthly(true)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${matrixMonthly ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
+                  Monthly
+                </button>
+              </div>
 
-            {/* Realistic / Worst case */}
-            <div className="flex items-center bg-[#f2efe6] rounded-lg p-0.5">
-              <button onClick={() => { setShowWorstCase(false); setSelectedCell(null); }} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${!showWorstCase ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
-                Realistic
-              </button>
-              <button onClick={() => { setShowWorstCase(true); setSelectedCell(null); }} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${showWorstCase ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
-                Worst case
-              </button>
+              <div className="flex items-center bg-[#f2efe6] rounded-lg p-0.5">
+                <button onClick={() => { setShowWorstCase(false); setSelectedCell(null); }} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${!showWorstCase ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
+                  Realistic
+                </button>
+                <button onClick={() => { setShowWorstCase(true); setSelectedCell(null); }} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${showWorstCase ? 'bg-[#4e7597] text-white shadow-md' : 'text-[#565656]'}`}>
+                  Worst case
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -805,7 +806,8 @@ export default function ShippingCalculator() {
                       <td
                         key={colIdx}
                         onClick={() => setSelectedCell(isSelected ? null : { row: rowIdx, col: colIdx })}
-                        className={`text-center p-2 text-sm font-semibold border-b border-[#9abbd8]/10 cursor-pointer transition-all ${getCellColor(value, calcs.maxAbs)} ${isSelected ? 'ring-2 ring-[#10222b] ring-offset-1' : 'hover:ring-1 hover:ring-[#9abbd8]'}`}
+                        style={getCellStyle(value, calcs.maxAbs)}
+                        className={`text-center p-2 text-sm font-semibold border-b border-[#9abbd8]/10 cursor-pointer transition-all ${isSelected ? 'ring-2 ring-[#10222b] ring-offset-1' : 'hover:ring-1 hover:ring-[#9abbd8]'}`}
                       >
                         {display >= 0 ? '+' : '-'}{sym}{Math.abs(display).toLocaleString()}
                       </td>
