@@ -362,8 +362,8 @@ export default function ShippingCalculator() {
     const totalTestCost = v1TestCost + (compareTwo ? v2TestCost : 0);
 
     return {
-      v1ShippingLost, v1BEOrders, v1BEPct, v1BEOrdersExcl, v1BEPctExcl, v1TestCost,
-      v2ShippingLost, v2BEOrders, v2BEPct, v2BEOrdersExcl, v2BEPctExcl, v2TestCost,
+      v1ShippingLost, v1BEOrders, v1BEPct, v1BEOrdersMo: Math.round(v1BEOrders / 12), v1TestCost,
+      v2ShippingLost, v2BEOrders, v2BEPct, v2BEOrdersMo: Math.round(v2BEOrders / 12), v2TestCost,
       v1MatrixReal, v1MatrixWorst, v2MatrixReal, v2MatrixWorst,
       maxAbs, v2WithAOV20, totalTestCost, contribExclCPA, contribInclCPA,
     };
@@ -583,8 +583,8 @@ export default function ShippingCalculator() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:ml-auto text-sm">
                 <span>
                   <span className="text-[#565656]">Breakeven </span>
-                  <span className="font-bold text-[#10222b]">{Math.round(calcs.v1BEOrders).toLocaleString()} orders</span>
-                  <span className="text-[#4e7597] font-semibold"> ({fmtPct(calcs.v1BEPct)})</span>
+                  <span className="font-bold text-[#10222b]">{calcs.v1BEOrdersMo.toLocaleString()} orders/mo</span>
+                  <span className="text-[#4e7597] font-semibold"> ({fmtPct(calcs.v1BEPct)} lift)</span>
                 </span>
                 <span className="text-[#565656]">·</span>
                 <span>
@@ -595,7 +595,7 @@ export default function ShippingCalculator() {
               </div>
             </div>
             <div className="mt-2 text-xs text-[#565656]">
-              Revenue forfeited: {fmt(calcs.v1ShippingLost)}/yr ({fmtMo(calcs.v1ShippingLost)}/mo) · Breakeven if orders cost CPA: {Math.round(calcs.v1BEOrdersExcl).toLocaleString()} orders ({fmtPct(calcs.v1BEPctExcl)})
+              Revenue forfeited: {fmt(calcs.v1ShippingLost)}/yr ({fmtMo(calcs.v1ShippingLost)}/mo) · {Math.round(calcs.v1BEOrders).toLocaleString()} additional orders/yr needed to break even
             </div>
           </div>
 
@@ -616,7 +616,7 @@ export default function ShippingCalculator() {
                 <div className="bg-white/60 rounded-xl p-4 border border-[#72ab7f]/20">
                   <div className="text-xs text-[#565656] mb-1">Breakeven</div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-[#243e42]">{Math.round(calcs.v2BEOrders).toLocaleString()} orders</span>
+                    <span className="text-2xl font-extrabold text-[#243e42]">{calcs.v2BEOrdersMo.toLocaleString()} orders/mo</span>
                     <span className="text-lg font-bold text-[#4e7597]">{fmtPct(calcs.v2BEPct)} lift</span>
                   </div>
                 </div>
@@ -634,12 +634,6 @@ export default function ShippingCalculator() {
                     <span className="font-semibold text-[#e57373]">{fmt(calcs.v2ShippingLost)}/yr</span>
                     <span className="text-xs text-[#565656] ml-1">({fmtMo(calcs.v2ShippingLost)}/mo)</span>
                   </div>
-                </div>
-
-                {/* Secondary: if orders cost CPA */}
-                <div className="flex justify-between items-center py-1.5 text-xs text-[#565656]/70">
-                  <span>Breakeven (if orders cost CPA)</span>
-                  <span>{Math.round(calcs.v2BEOrdersExcl).toLocaleString()} orders ({fmtPct(calcs.v2BEPctExcl)})</span>
                 </div>
 
                 <VerdictBadge breakEvenPct={calcs.v2BEPct} />
