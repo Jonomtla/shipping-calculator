@@ -80,12 +80,12 @@ function SliderInput({
 /* ─── Verdict Badge ─── */
 function VerdictBadge({ breakEvenPct }: { breakEvenPct: number }) {
   let color: string, bg: string, border: string, text: string;
-  if (breakEvenPct <= 3) {
+  if (breakEvenPct <= 5) {
     color = 'text-[#72ab7f]';
     bg = 'bg-[#72ab7f]/10';
     border = 'border-[#72ab7f]/30';
     text = 'Easy — low lift needed';
-  } else if (breakEvenPct <= 7) {
+  } else if (breakEvenPct <= 10) {
     color = 'text-[#d4a84b]';
     bg = 'bg-[#d4a84b]/10';
     border = 'border-[#d4a84b]/30';
@@ -99,7 +99,7 @@ function VerdictBadge({ breakEvenPct }: { breakEvenPct: number }) {
 
   return (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${bg} ${border}`}>
-      <div className={`w-2.5 h-2.5 rounded-full ${breakEvenPct <= 3 ? 'bg-[#72ab7f]' : breakEvenPct <= 7 ? 'bg-[#d4a84b]' : 'bg-[#e57373]'}`} />
+      <div className={`w-2.5 h-2.5 rounded-full ${breakEvenPct <= 5 ? 'bg-[#72ab7f]' : breakEvenPct <= 10 ? 'bg-[#d4a84b]' : 'bg-[#e57373]'}`} />
       <span className={`text-sm font-semibold ${color}`}>{text}</span>
     </div>
   );
@@ -111,13 +111,11 @@ function getCellColor(value: number, maxAbs: number): string {
   const intensity = Math.min(Math.abs(value) / maxAbs, 1);
 
   if (value > 0) {
-    // Green scale
     if (intensity > 0.7) return 'bg-[#72ab7f] text-white';
     if (intensity > 0.4) return 'bg-[#72ab7f]/60 text-[#10222b]';
     if (intensity > 0.15) return 'bg-[#72ab7f]/30 text-[#10222b]';
     return 'bg-[#72ab7f]/15 text-[#10222b]';
   } else {
-    // Red scale
     if (intensity > 0.7) return 'bg-[#e57373] text-white';
     if (intensity > 0.4) return 'bg-[#e57373]/60 text-[#10222b]';
     if (intensity > 0.15) return 'bg-[#e57373]/30 text-[#10222b]';
@@ -127,15 +125,21 @@ function getCellColor(value: number, maxAbs: number): string {
 
 /* ─── Main Calculator ─── */
 export default function ShippingCalculator() {
-  // Inputs
+  // Inputs — Business metrics
   const [annualOrders, setAnnualOrders] = useState(16153);
   const [aov, setAov] = useState(268);
   const [marginPct, setMarginPct] = useState(60);
   const [cpa, setCpa] = useState(45);
-  const [flatRate300, setFlatRate300] = useState(10);
+  const [flatRateShipping, setFlatRateShipping] = useState(10);
   const [standardShipping, setStandardShipping] = useState(30);
-  const [ordersAt300, setOrdersAt300] = useState(5257);
-  const [ordersAt200, setOrdersAt200] = useState(10017);
+
+  // Inputs — Test thresholds
+  const [threshold1, setThreshold1] = useState(300);
+  const [threshold2, setThreshold2] = useState(200);
+
+  // Inputs — Qualifying orders
+  const [ordersAboveT1, setOrdersAboveT1] = useState(5257);
+  const [ordersAboveT2, setOrdersAboveT2] = useState(10017);
 
   // Toggle for CPA in scenario matrix
   const [showInclCPA, setShowInclCPA] = useState(false);
@@ -144,31 +148,35 @@ export default function ShippingCalculator() {
   const [showOrderDist, setShowOrderDist] = useState(false);
 
   // Calculations
+  // Margin already includes CPA. For incremental orders that don't cost CPA,
+  // we add CPA back to get the "excl CPA" (realistic) contribution.
   const calcs = useMemo(() => {
     const margin = marginPct / 100;
 
-    // Orders between $200 and $300
-    const orders200to300 = ordersAt200 - ordersAt300;
+    // Orders between threshold 2 and threshold 1
+    const ordersBetween = ordersAboveT2 - ordersAboveT1;
 
-    // --- Var 1: Free Shipping >$300 ---
-    const var1ShippingLost = ordersAt300 * flatRate300;
-    const contribExclCPA = aov * margin;
-    const contribInclCPA = aov * margin - cpa;
-    const var1BreakevenOrders = contribExclCPA > 0 ? var1ShippingLost / contribExclCPA : Infinity;
-    const var1BreakevenPct = annualOrders > 0 ? (var1BreakevenOrders / annualOrders) * 100 : 0;
-    const var1BreakevenOrdersCPA = contribInclCPA > 0 ? var1ShippingLost / contribInclCPA : Infinity;
-    const var1BreakevenPctCPA = annualOrders > 0 ? (var1BreakevenOrdersCPA / annualOrders) * 100 : 0;
-    const var1TestCost = (var1ShippingLost / 12) * (1 / 3);
+    // Contribution per incremental order
+    const contribInclCPA = aov * margin; // margin already has CPA baked in
+    const contribExclCPA = aov * margin + cpa; // add CPA back (these orders don't need acquisition)
 
-    // --- Var 2: Free Shipping >$200 ---
-    const var2ShippingLost = (orders200to300 * standardShipping) + (ordersAt300 * flatRate300);
-    const var2BreakevenOrders = contribExclCPA > 0 ? var2ShippingLost / contribExclCPA : Infinity;
-    const var2BreakevenPct = annualOrders > 0 ? (var2BreakevenOrders / annualOrders) * 100 : 0;
-    const var2BreakevenOrdersCPA = contribInclCPA > 0 ? var2ShippingLost / contribInclCPA : Infinity;
-    const var2BreakevenPctCPA = annualOrders > 0 ? (var2BreakevenOrdersCPA / annualOrders) * 100 : 0;
-    const var2TestCost = (var2ShippingLost / 12) * (1 / 3);
+    // --- Variation 1: Free Shipping above threshold 1 ---
+    const v1ShippingLost = ordersAboveT1 * flatRateShipping;
+    const v1BreakevenOrders = contribInclCPA > 0 ? v1ShippingLost / contribInclCPA : Infinity;
+    const v1BreakevenPct = annualOrders > 0 ? (v1BreakevenOrders / annualOrders) * 100 : 0;
+    const v1BreakevenOrdersExcl = contribExclCPA > 0 ? v1ShippingLost / contribExclCPA : Infinity;
+    const v1BreakevenPctExcl = annualOrders > 0 ? (v1BreakevenOrdersExcl / annualOrders) * 100 : 0;
+    const v1TestCost = (v1ShippingLost / 12) * (1 / 3);
 
-    // --- Scenario Matrix for Var 2 ---
+    // --- Variation 2: Free Shipping above threshold 2 ---
+    const v2ShippingLost = (ordersBetween * standardShipping) + (ordersAboveT1 * flatRateShipping);
+    const v2BreakevenOrders = contribInclCPA > 0 ? v2ShippingLost / contribInclCPA : Infinity;
+    const v2BreakevenPct = annualOrders > 0 ? (v2BreakevenOrders / annualOrders) * 100 : 0;
+    const v2BreakevenOrdersExcl = contribExclCPA > 0 ? v2ShippingLost / contribExclCPA : Infinity;
+    const v2BreakevenPctExcl = annualOrders > 0 ? (v2BreakevenOrdersExcl / annualOrders) * 100 : 0;
+    const v2TestCost = (v2ShippingLost / 12) * (1 / 3);
+
+    // --- Scenario Matrix for Variation 2 ---
     const buildMatrix = (useCPA: boolean) => {
       const contribPerOrder = useCPA ? contribInclCPA : contribExclCPA;
       return AOV_LIFTS.map((aovLift) =>
@@ -176,7 +184,7 @@ export default function ShippingCalculator() {
           const additionalOrders = annualOrders * (cvrLift / 100);
           const revenueFromNewOrders = additionalOrders * contribPerOrder;
           const revenueFromAOVLift = aovLift * annualOrders * margin;
-          return revenueFromNewOrders + revenueFromAOVLift - var2ShippingLost;
+          return revenueFromNewOrders + revenueFromAOVLift - v2ShippingLost;
         })
       );
     };
@@ -184,42 +192,37 @@ export default function ShippingCalculator() {
     const matrixExclCPA = buildMatrix(false);
     const matrixInclCPA = buildMatrix(true);
 
-    // Find max absolute value across both matrices for consistent color scaling
     const allValues = [...matrixExclCPA.flat(), ...matrixInclCPA.flat()];
     const maxAbs = Math.max(...allValues.map(Math.abs), 1);
 
-    // --- Callouts ---
-    // "Var 2 needs Z% CVR lift alone, but only W% with a $20 AOV bump"
-    // Find the CVR lift needed with $20 AOV bump for Var 2 (excl CPA)
-    const var2WithAOV20 = (() => {
+    // Callout: CVR lift needed with $20 AOV bump (excl CPA / realistic)
+    const v2WithAOV20 = (() => {
       const aovLift = 20;
       const aovContrib = aovLift * annualOrders * margin;
-      const remaining = var2ShippingLost - aovContrib;
+      const remaining = v2ShippingLost - aovContrib;
       if (remaining <= 0) return 0;
       return contribExclCPA > 0 ? (remaining / contribExclCPA / annualOrders) * 100 : Infinity;
     })();
 
     return {
-      var1ShippingLost,
-      var1BreakevenOrders,
-      var1BreakevenPct,
-      var1BreakevenOrdersCPA,
-      var1BreakevenPctCPA,
-      var1TestCost,
-      var2ShippingLost,
-      var2BreakevenOrders,
-      var2BreakevenPct,
-      var2BreakevenOrdersCPA,
-      var2BreakevenPctCPA,
-      var2TestCost,
+      v1ShippingLost,
+      v1BreakevenOrders,
+      v1BreakevenPct,
+      v1BreakevenOrdersExcl,
+      v1BreakevenPctExcl,
+      v1TestCost,
+      v2ShippingLost,
+      v2BreakevenOrders,
+      v2BreakevenPct,
+      v2BreakevenOrdersExcl,
+      v2BreakevenPctExcl,
+      v2TestCost,
       matrixExclCPA,
       matrixInclCPA,
       maxAbs,
-      var2WithAOV20,
-      contribExclCPA,
-      contribInclCPA,
+      v2WithAOV20,
     };
-  }, [annualOrders, aov, marginPct, cpa, flatRate300, standardShipping, ordersAt300, ordersAt200]);
+  }, [annualOrders, aov, marginPct, cpa, flatRateShipping, standardShipping, ordersAboveT1, ordersAboveT2]);
 
   const activeMatrix = showInclCPA ? calcs.matrixInclCPA : calcs.matrixExclCPA;
 
@@ -234,7 +237,7 @@ export default function ShippingCalculator() {
           Free Shipping Profitability Calculator
         </h1>
         <p className="text-[#565656] text-lg max-w-2xl mx-auto">
-          SR-005 — Model the financial impact of free shipping thresholds.
+          Model the financial impact of free shipping thresholds.
           Adjust assumptions and instantly see breakeven points.
         </p>
       </div>
@@ -242,39 +245,56 @@ export default function ShippingCalculator() {
       {/* Main Grid: Inputs + Variation Cards */}
       <div className="grid lg:grid-cols-5 gap-6">
         {/* Inputs Panel */}
-        <div className="lg:col-span-2 bg-white border-2 border-[#9abbd8]/20 rounded-2xl p-6 card-shadow animate-fade-in-left">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-[#4e7597]/10 rounded-lg">
-              <svg className="w-5 h-5 text-[#4e7597]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
+        <div className="lg:col-span-2 space-y-6">
+          {/* Business Metrics */}
+          <div className="bg-white border-2 border-[#9abbd8]/20 rounded-2xl p-6 card-shadow animate-fade-in-left">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-[#4e7597]/10 rounded-lg">
+                <svg className="w-5 h-5 text-[#4e7597]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold text-[#10222b]">Business Metrics</h2>
             </div>
-            <h2 className="text-lg font-semibold text-[#10222b]">Assumptions</h2>
+
+            <div className="space-y-5">
+              <SliderInput label="Annual orders" value={annualOrders} onChange={setAnnualOrders} min={1000} max={100000} step={100} />
+              <SliderInput label="Average order value" value={aov} onChange={setAov} min={50} max={500} step={1} prefix="$" />
+              <SliderInput label="Contribution margin %" value={marginPct} onChange={setMarginPct} min={30} max={80} step={1} suffix="%" />
+              <SliderInput label="Cost per acquisition" value={cpa} onChange={setCpa} min={0} max={150} step={1} prefix="$" />
+
+              <div className="border-t border-[#9abbd8]/20 my-4" />
+
+              <SliderInput label="Shipping charge on high-value orders" value={flatRateShipping} onChange={setFlatRateShipping} min={0} max={50} step={1} prefix="$" />
+              <SliderInput label="Standard shipping charge" value={standardShipping} onChange={setStandardShipping} min={0} max={80} step={1} prefix="$" />
+            </div>
           </div>
 
-          <div className="space-y-5">
-            <SliderInput label="Annual Orders" value={annualOrders} onChange={setAnnualOrders} min={1000} max={100000} step={100} />
-            <SliderInput label="AOV" value={aov} onChange={setAov} min={50} max={500} step={1} prefix="$" />
+          {/* Test Thresholds */}
+          <div className="bg-white border-2 border-[#72ab7f]/20 rounded-2xl p-6 card-shadow animate-fade-in-left">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-[#72ab7f]/10 rounded-lg">
+                <svg className="w-5 h-5 text-[#72ab7f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold text-[#10222b]">Test Thresholds</h2>
+            </div>
 
-            <div className="border-t border-[#9abbd8]/20 my-4" />
+            <div className="space-y-5">
+              <SliderInput label="Variation 1 — free shipping above" value={threshold1} onChange={setThreshold1} min={100} max={500} step={10} prefix="$" />
+              <SliderInput label="Orders above this threshold" value={ordersAboveT1} onChange={setOrdersAboveT1} min={0} max={annualOrders} step={1} />
 
-            <SliderInput label="Contribution Margin % (excl CPA)" value={marginPct} onChange={setMarginPct} min={30} max={80} step={1} suffix="%" />
-            <SliderInput label="CPA (cost per acquisition)" value={cpa} onChange={setCpa} min={0} max={150} step={1} prefix="$" />
+              <div className="border-t border-[#9abbd8]/20 my-4" />
 
-            <div className="border-t border-[#9abbd8]/20 my-4" />
+              <SliderInput label="Variation 2 — free shipping above" value={threshold2} onChange={setThreshold2} min={50} max={500} step={10} prefix="$" />
+              <SliderInput label="Orders above this threshold" value={ordersAboveT2} onChange={setOrdersAboveT2} min={0} max={annualOrders} step={1} />
 
-            <SliderInput label="Flat rate charged ($300+ orders)" value={flatRate300} onChange={setFlatRate300} min={0} max={50} step={1} prefix="$" />
-            <SliderInput label="Standard shipping (<$300 orders)" value={standardShipping} onChange={setStandardShipping} min={0} max={80} step={1} prefix="$" />
-
-            <div className="border-t border-[#9abbd8]/20 my-4" />
-
-            <SliderInput label="Orders qualifying at $300 threshold" value={ordersAt300} onChange={setOrdersAt300} min={0} max={annualOrders} step={1} />
-            <SliderInput label="Orders qualifying at $200 threshold" value={ordersAt200} onChange={setOrdersAt200} min={0} max={annualOrders} step={1} />
-
-            <div className="text-xs text-[#565656] bg-[#f4faff] rounded-lg p-3 border border-[#9abbd8]/20">
-              <span className="font-semibold text-[#4e7597]">{fmtPct((ordersAt300 / annualOrders) * 100)}</span> of orders are $300+
-              &nbsp;·&nbsp;
-              <span className="font-semibold text-[#4e7597]">{fmtPct((ordersAt200 / annualOrders) * 100)}</span> are $200+
+              <div className="text-xs text-[#565656] bg-[#f4faff] rounded-lg p-3 border border-[#9abbd8]/20">
+                <span className="font-semibold text-[#4e7597]">{fmtPct((ordersAboveT1 / annualOrders) * 100)}</span> of orders are above {fmt(threshold1)}
+                &nbsp;·&nbsp;
+                <span className="font-semibold text-[#4e7597]">{fmtPct((ordersAboveT2 / annualOrders) * 100)}</span> are above {fmt(threshold2)}
+              </div>
             </div>
           </div>
         </div>
@@ -283,7 +303,7 @@ export default function ShippingCalculator() {
         <div className="lg:col-span-3 space-y-6">
           {/* Variation Cards */}
           <div className="grid md:grid-cols-2 gap-4 animate-fade-in-right">
-            {/* Var 1 */}
+            {/* Variation 1 */}
             <div className="bg-white border-2 border-[#9abbd8]/20 rounded-2xl p-5 card-shadow hover-lift">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-1.5 bg-[#4e7597]/20 rounded-lg">
@@ -291,37 +311,37 @@ export default function ShippingCalculator() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
                   </svg>
                 </div>
-                <h3 className="font-semibold text-[#10222b]">Var 1: Free Shipping &gt;$300</h3>
+                <h3 className="font-semibold text-[#10222b]">Variation 1: Free Shipping &gt;{fmt(threshold1)}</h3>
               </div>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-[#9abbd8]/15">
                   <span className="text-sm text-[#565656]">Shipping revenue forfeited</span>
-                  <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.var1ShippingLost)}</span>
+                  <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.v1ShippingLost)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#9abbd8]/15">
-                  <span className="text-sm text-[#565656]">Breakeven (excl CPA)</span>
+                  <span className="text-sm text-[#565656]">Breakeven</span>
                   <div className="text-right">
-                    <span className="text-lg font-bold text-[#10222b]">{fmtOrders(calcs.var1BreakevenOrders)} orders</span>
-                    <div className="text-xs text-[#4e7597]">{fmtPct(calcs.var1BreakevenPct)} lift</div>
+                    <span className="text-lg font-bold text-[#10222b]">{fmtOrders(calcs.v1BreakevenOrders)} orders</span>
+                    <div className="text-xs text-[#4e7597]">{fmtPct(calcs.v1BreakevenPct)} lift</div>
                   </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#9abbd8]/15">
-                  <span className="text-sm text-[#565656]/60">Breakeven (incl CPA)</span>
+                  <span className="text-sm text-[#565656]/60">Breakeven (excl CPA)</span>
                   <div className="text-right opacity-60">
-                    <span className="text-sm font-semibold text-[#565656]">{fmtOrders(calcs.var1BreakevenOrdersCPA)} orders</span>
-                    <div className="text-xs text-[#565656]">{fmtPct(calcs.var1BreakevenPctCPA)} lift</div>
+                    <span className="text-sm font-semibold text-[#565656]">{fmtOrders(calcs.v1BreakevenOrdersExcl)} orders</span>
+                    <div className="text-xs text-[#565656]">{fmtPct(calcs.v1BreakevenPctExcl)} lift</div>
                   </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#9abbd8]/15">
                   <span className="text-sm text-[#565656]">Test cost (33%, 1 month)</span>
-                  <span className="font-semibold text-[#10222b]">{fmt(calcs.var1TestCost)}</span>
+                  <span className="font-semibold text-[#10222b]">{fmt(calcs.v1TestCost)}</span>
                 </div>
-                <VerdictBadge breakEvenPct={calcs.var1BreakevenPct} />
+                <VerdictBadge breakEvenPct={calcs.v1BreakevenPct} />
               </div>
             </div>
 
-            {/* Var 2 */}
+            {/* Variation 2 */}
             <div className="bg-gradient-to-br from-[#243e42]/5 to-[#72ab7f]/10 border-2 border-[#72ab7f]/30 rounded-2xl p-5 card-shadow hover-lift">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-1.5 bg-[#72ab7f]/20 rounded-lg">
@@ -329,33 +349,33 @@ export default function ShippingCalculator() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
                   </svg>
                 </div>
-                <h3 className="font-semibold text-[#243e42]">Var 2: Free Shipping &gt;$200</h3>
+                <h3 className="font-semibold text-[#243e42]">Variation 2: Free Shipping &gt;{fmt(threshold2)}</h3>
               </div>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-[#72ab7f]/20">
                   <span className="text-sm text-[#565656]">Shipping revenue forfeited</span>
-                  <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.var2ShippingLost)}</span>
+                  <span className="text-lg font-bold text-[#e57373]">{fmt(calcs.v2ShippingLost)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#72ab7f]/20">
-                  <span className="text-sm text-[#565656]">Breakeven (excl CPA)</span>
+                  <span className="text-sm text-[#565656]">Breakeven</span>
                   <div className="text-right">
-                    <span className="text-lg font-bold text-[#243e42]">{fmtOrders(calcs.var2BreakevenOrders)} orders</span>
-                    <div className="text-xs text-[#4e7597]">{fmtPct(calcs.var2BreakevenPct)} lift</div>
+                    <span className="text-lg font-bold text-[#243e42]">{fmtOrders(calcs.v2BreakevenOrders)} orders</span>
+                    <div className="text-xs text-[#4e7597]">{fmtPct(calcs.v2BreakevenPct)} lift</div>
                   </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#72ab7f]/20">
-                  <span className="text-sm text-[#565656]/60">Breakeven (incl CPA)</span>
+                  <span className="text-sm text-[#565656]/60">Breakeven (excl CPA)</span>
                   <div className="text-right opacity-60">
-                    <span className="text-sm font-semibold text-[#565656]">{fmtOrders(calcs.var2BreakevenOrdersCPA)} orders</span>
-                    <div className="text-xs text-[#565656]">{fmtPct(calcs.var2BreakevenPctCPA)} lift</div>
+                    <span className="text-sm font-semibold text-[#565656]">{fmtOrders(calcs.v2BreakevenOrdersExcl)} orders</span>
+                    <div className="text-xs text-[#565656]">{fmtPct(calcs.v2BreakevenPctExcl)} lift</div>
                   </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#72ab7f]/20">
                   <span className="text-sm text-[#565656]">Test cost (33%, 1 month)</span>
-                  <span className="font-semibold text-[#243e42]">{fmt(calcs.var2TestCost)}</span>
+                  <span className="font-semibold text-[#243e42]">{fmt(calcs.v2TestCost)}</span>
                 </div>
-                <VerdictBadge breakEvenPct={calcs.var2BreakevenPct} />
+                <VerdictBadge breakEvenPct={calcs.v2BreakevenPct} />
               </div>
             </div>
           </div>
@@ -372,12 +392,12 @@ export default function ShippingCalculator() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white rounded-xl p-4 border border-[#9abbd8]/20">
-                <div className="text-xs text-[#565656] mb-1">Var 1 test cost (1 month)</div>
-                <div className="text-2xl font-bold text-[#4e7597]">{fmt(calcs.var1TestCost)}</div>
+                <div className="text-xs text-[#565656] mb-1">Variation 1 test cost (1 month)</div>
+                <div className="text-2xl font-bold text-[#4e7597]">{fmt(calcs.v1TestCost)}</div>
               </div>
               <div className="bg-white rounded-xl p-4 border border-[#72ab7f]/20">
-                <div className="text-xs text-[#565656] mb-1">Var 2 test cost (1 month)</div>
-                <div className="text-2xl font-bold text-[#72ab7f]">{fmt(calcs.var2TestCost)}</div>
+                <div className="text-xs text-[#565656] mb-1">Variation 2 test cost (1 month)</div>
+                <div className="text-2xl font-bold text-[#72ab7f]">{fmt(calcs.v2TestCost)}</div>
               </div>
             </div>
             <p className="text-xs text-[#565656] mt-3">
@@ -397,7 +417,7 @@ export default function ShippingCalculator() {
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-[#10222b]">Scenario Matrix — Var 2 (Free Shipping &gt;$200)</h2>
+              <h2 className="text-lg font-semibold text-[#10222b]">Scenario Matrix — Variation 2 (Free Shipping &gt;{fmt(threshold2)})</h2>
               <p className="text-sm text-[#565656]">Net annual profit impact across CVR lift + AOV lift combinations</p>
             </div>
           </div>
@@ -482,7 +502,7 @@ export default function ShippingCalculator() {
             </svg>
             <div>
               <p className="font-medium text-[#10222b] mb-1">How to read this matrix</p>
-              <p>Each cell shows the <strong>net annual profit impact</strong> of Var 2 if you achieve that combination of CVR lift (columns) and AOV lift (rows). <span className="text-[#72ab7f] font-semibold">Green = profitable</span>, <span className="text-[#e57373] font-semibold">red = loss</span>. Find the combinations where the test pays for itself.</p>
+              <p>Each cell shows the <strong>net annual profit impact</strong> of Variation 2 if you achieve that combination of CVR lift (columns) and AOV lift (rows). <span className="text-[#72ab7f] font-semibold">Green = profitable</span>, <span className="text-[#e57373] font-semibold">red = loss</span>. Find the combinations where the test pays for itself.</p>
             </div>
           </div>
         </div>
@@ -494,23 +514,23 @@ export default function ShippingCalculator() {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="bg-white/10 rounded-xl p-4 border border-white/10">
             <p className="text-sm text-[#9abbd8]">
-              <span className="text-white font-semibold">Var 1</span> breaks even at just{' '}
-              <span className="text-[#72ab7f] font-bold">{fmtOrders(calcs.var1BreakevenOrders)} additional orders</span>{' '}
-              (<span className="text-[#72ab7f] font-bold">{fmtPct(calcs.var1BreakevenPct)} lift</span>)
+              <span className="text-white font-semibold">Variation 1</span> breaks even at just{' '}
+              <span className="text-[#72ab7f] font-bold">{fmtOrders(calcs.v1BreakevenOrders)} additional orders</span>{' '}
+              (<span className="text-[#72ab7f] font-bold">{fmtPct(calcs.v1BreakevenPct)} lift</span>)
             </p>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/10">
             <p className="text-sm text-[#9abbd8]">
-              <span className="text-white font-semibold">Var 2</span> needs{' '}
-              <span className="text-white font-bold">{fmtPct(calcs.var2BreakevenPct)}</span> CVR lift alone, but only{' '}
-              <span className="text-[#72ab7f] font-bold">{fmtPct(calcs.var2WithAOV20)}</span> with a $20 AOV bump
+              <span className="text-white font-semibold">Variation 2</span> needs{' '}
+              <span className="text-white font-bold">{fmtPct(calcs.v2BreakevenPct)}</span> CVR lift alone, but only{' '}
+              <span className="text-[#72ab7f] font-bold">{fmtPct(calcs.v2WithAOV20)}</span> with a $20 AOV bump
             </p>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/10">
             <p className="text-sm text-[#9abbd8]">
               <span className="text-white font-semibold">Test cost exposure:</span>{' '}
-              <span className="text-white font-bold">{fmt(calcs.var1TestCost)}</span> (Var 1) /{' '}
-              <span className="text-white font-bold">{fmt(calcs.var2TestCost)}</span> (Var 2) for one month
+              <span className="text-white font-bold">{fmt(calcs.v1TestCost)}</span> (Variation 1) /{' '}
+              <span className="text-white font-bold">{fmt(calcs.v2TestCost)}</span> (Variation 2) for one month
             </p>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/10">
